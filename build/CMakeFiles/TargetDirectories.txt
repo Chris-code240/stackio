@@ -1,0 +1,3 @@
+C:/Users/District Trainer/Desktop/c++/corestack/build/CMakeFiles/corestack.dir
+C:/Users/District Trainer/Desktop/c++/corestack/build/CMakeFiles/edit_cache.dir
+C:/Users/District Trainer/Desktop/c++/corestack/build/CMakeFiles/rebuild_cache.dir

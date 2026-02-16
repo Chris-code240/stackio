@@ -1,0 +1,8 @@
+# ninja log v7
+24	969	7929593561387665	CMakeFiles/corestack.dir/source/handler.cpp.obj	e96e10889196a357
+82	1138	7929593561957916	CMakeFiles/corestack.dir/source/storage_engine.cpp.obj	ff45d4946e7a3209
+41	1472	7929593561493853	CMakeFiles/corestack.dir/source/request.cpp.obj	614d5cecdfe12121
+8	1484	7929593561238112	CMakeFiles/corestack.dir/main.cpp.obj	f4f5d1644bc770ea
+57	1551	7929593561715222	CMakeFiles/corestack.dir/source/router.cpp.obj	e624351a1180612b
+70	1558	7929593561847270	CMakeFiles/corestack.dir/source/server.cpp.obj	43a9a4b1580ca3e0
+1560	2159	7929593576757665	corestack.exe	83577ea7eefcd7ac
