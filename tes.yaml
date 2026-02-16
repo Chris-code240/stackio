@@ -1,0 +1,33 @@
+project_name: SOME_PROJECT_NAME
+
+auth_model:
+  name: students
+  properties:
+    username:
+      type: string
+      unique: True
+      minSize: 4
+      maxSize: 120
+    password:
+      type: password
+    email:
+      type: email
+
+
+endpoints:
+  students:
+    method: 
+      name:  GET
+      auth: False
+    
+    method:
+      name: POST
+      auth: True
+    
+    method:
+      name: PATCH
+      auth: True
+    
+    method:
+      name: PUT
+      auth: True
