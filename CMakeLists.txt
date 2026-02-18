@@ -3,7 +3,6 @@ project(stackio)
 
 set(CMAKE_CXX_STANDARD 17)
 
-# App
 add_executable(${PROJECT_NAME} main.cpp source/handler.cpp source/request.cpp source/router.cpp source/server.cpp source/storage_engine.cpp)
 
 target_include_directories(${PROJECT_NAME}
