@@ -5,6 +5,7 @@
 #include <string>
 #include <optional>
 #include "request.h"
+#include <regex>
 
 struct Handler{
     std::string _name;

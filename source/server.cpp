@@ -32,13 +32,13 @@ Server::Server(int port){
     int wsastart = WSAStartup(MAKEWORD(2,2), &_wsa_data);
     if(wsastart != 0){
         // MAKEWORD requests version 2 of WinSock
-        std::cout<<"Error: "<<wsastart;
+        std::cout<<"[SERVER_ERROR] WSAStartup"<<wsastart;
         std::exit(-1);
     }
     // create socket
     this->_socket = socket(AF_INET, SOCK_STREAM, 0);
     if(_socket == SOCKET_ERROR){
-        std::cout<<"Socket Creation Error: \n";
+        std::cout<<"[SERVER_ERROR] Socket Creation Error\n";
         std::exit(-1);
     }
     _port = port;
@@ -49,7 +49,7 @@ Server::Server(int port){
     _socket_address.sin_addr.s_addr = htonl(INADDR_ANY);
 
     if(bind(_socket, (struct sockaddr*)&_socket_address,sizeof(_socket_address)) == SOCKET_ERROR){
-        std::cout<<"Binding error\n";
+        std::cout<<"[SERVER_ERROR] Binding error\n";
         std::exit(-1);
     } 
     Handler getHandler("getHandler",[this](std::optional<HttpRequest> request){
@@ -57,7 +57,7 @@ Server::Server(int port){
             // take ID from request then grab data from the store
             HttpRequest req = request.value();
             
-            std::optional<std::string> pulledData = _storageEngine.get(req._body);
+            std::optional<std::string> pulledData = _storageEngine.get(req._body.substr(1));
             // send data to client
             std::string message;
             if(pulledData.has_value()) {
@@ -71,7 +71,7 @@ Server::Server(int port){
         }
         
     });
-    _router.addRoute({"GET"},"/",getHandler);
+    _router.addRoute({"GET"},"/?[A-Za-z0-9]+",getHandler);
 
     _router.addRoute({"POST"}, "/",Handler("postHandler",[this](std::optional<HttpRequest> request){
 
@@ -87,24 +87,32 @@ Server::Server(int port){
             res["success"] = true;
             std::string message = req.prepareMessage(res.dump());
             send(req.clientSocket,message.c_str(),(int)strlen(message.c_str()), 0);
+            std::cout<<"Called PostHandler..."<<message<<"\n";
 
         }catch(std::exception e){
             std::cout<<"Error: "<<e.what()<<"\n";
         }
-        // for(auto it : data.items()){
-        //     _storageEngine.set(it.key(), it.value());
-        // }
-        
-        // std::string message = req.prepareMessage(json("{'success':true}").dump());
 
-        // send(req.clientSocket,message.c_str(),(int)strlen(message.c_str()), 0);
         closesocket(req.clientSocket);
     }));
-    // _router.addRoute({"POST"},"/",Handler("postHandler",[](std::optional<std::string> id){std::cout<<"Called postHandler\n";}));
 }
 
 
+void Server::routeRequest(HttpRequest request){
 
+    for(auto route : _router._routes){
+        std::cout<<std::regex_match(request._path, std::regex(route._path))<<" - " <<route._path<<" - ";
+        for(auto m : route._methods) std::cout<<m<<" ";
+        std::cout<<"\n";
+        if(std::regex_match(request._path, std::regex(route._path)) && std::find(route._methods.begin(), route._methods.end(), request._method) != route._methods.end()){
+            std::cout<<"Handling request..\n";
+            route._handler._callBack(request);
+            return;
+        }
+        closesocket(request.clientSocket);
+    }
+
+}
 
 SOCKET Server::acceptRequest(){
     int addrLen = sizeof(_socket_address); 
@@ -147,15 +155,12 @@ HttpRequest Server::createRequest(){
 
 void Server::respondRequest(HttpRequest request){
     if(request.clientSocket == NULL) return;
-
-    _router.route(request); //
-
-
+    routeRequest(request);
 }
 void Server::serve() {
     startListening();
 
-    std::cout << ">>>> Server is live and listening: Socket => "<<_socket<<" <<<<\n";
+    std::cout << ">>>> Server Is Live <<<<\n";
     while (true) {
  
         const HttpRequest request = createRequest();

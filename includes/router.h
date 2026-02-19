@@ -8,9 +8,9 @@ struct Route{
     Route(std::vector<std::string> methods, std::string path,Handler handler): _methods(methods), _path(path), _handler(handler){}
 };
 class Router{
-    private:
-        std::vector<Route > _routes;
     public:
+        std::vector<Route > _routes;
+
         void addRoute(std::vector<std::string> methods, std::string path,Handler handler );
 
         Response route(HttpRequest request);   
