@@ -2,31 +2,6 @@
 #include <string>
 
 
-std::unordered_map<std::string, std::string> parseHeaders(const std::string& request) {
-    std::unordered_map<std::string, std::string> headers;
-    std::stringstream stream(request);
-    std::string line;
-
-    if (!std::getline(stream, line)) return headers;
-
-    while (std::getline(stream, line) && line != "\r") {
-        size_t colonPos = line.find(':');
-        if (colonPos != std::string::npos) {
-            std::string key = line.substr(0, colonPos);
-            
-            // Extract the Value (skip the space after the colon)
-            std::string value = line.substr(colonPos + 1);
-
-            // Trim whitespace/carriage returns
-            if (!value.empty() && value.back() == '\r') value.pop_back();
-            if (!value.empty() && value.front() == ' ') value.erase(0, 1);
-
-            headers[key] = value;
-        }
-    }
-
-    return headers;
-}
 Server::Server(int port){
     WSADATA _wsa_data;
     int wsastart = WSAStartup(MAKEWORD(2,2), &_wsa_data);
@@ -53,22 +28,25 @@ Server::Server(int port){
         std::exit(-1);
     } 
     Handler getHandler("getHandler",[this](std::optional<HttpRequest> request){
-        if(request.has_value() && request.value().clientSocket){
-            // take ID from request then grab data from the store
-            HttpRequest req = request.value();
-            
-            std::optional<std::string> pulledData = _storageEngine.get(req._body.substr(1));
-            // send data to client
-            std::string message;
-            if(pulledData.has_value()) {
-                message = req.prepareMessage(pulledData.value());
-                send(request.value().clientSocket,message.c_str(),(int)strlen(message.c_str()),0);
-            }else{
-                message = req.prepareMessage("{}");
-                send(req.clientSocket,message.c_str(), (int)strlen(message.c_str()), 0);
-            }
-            closesocket(request.value().clientSocket);
+        if(!request.has_value()) return;
+        // take ID from request then grab data from the store
+
+        HttpRequest req = request.value();
+        std::optional<std::string> pulledData = _storageEngine.get(req._path.substr(1));
+        // send data to client
+        std::string message;
+        if(pulledData.has_value()) {
+            message = Response(200,json(pulledData)).dump();
+            std::cout<<"\nResponse:...\n"<<message<<"\n";
+            send(request.value().clientSocket,message.c_str(),(int)strlen(message.c_str()),0);
+        }else{
+            message = Response(400,json("")).dump();
+            std::cout<<"\nResponse:...\n"<<message<<"\n";
+            send(req.clientSocket,message.c_str(), (int)strlen(message.c_str()), 0);
         }
+        closesocket(request.value().clientSocket);
+        
+        return;
         
     });
     _router.addRoute({"GET"},"/?[A-Za-z0-9]+",getHandler);
@@ -87,7 +65,6 @@ Server::Server(int port){
             res["success"] = true;
             std::string message = req.prepareMessage(res.dump());
             send(req.clientSocket,message.c_str(),(int)strlen(message.c_str()), 0);
-            std::cout<<"Called PostHandler..."<<message<<"\n";
 
         }catch(std::exception e){
             std::cout<<"Error: "<<e.what()<<"\n";
@@ -102,10 +79,7 @@ void Server::routeRequest(HttpRequest request){
 
     for(auto route : _router._routes){
         std::cout<<std::regex_match(request._path, std::regex(route._path))<<" - " <<route._path<<" - ";
-        for(auto m : route._methods) std::cout<<m<<" ";
-        std::cout<<"\n";
         if(std::regex_match(request._path, std::regex(route._path)) && std::find(route._methods.begin(), route._methods.end(), request._method) != route._methods.end()){
-            std::cout<<"Handling request..\n";
             route._handler._callBack(request);
             return;
         }
@@ -147,7 +121,7 @@ HttpRequest Server::createRequest(){
     if (body) {
         body += 4; // Move pointer past the \r\n\r\n
     }
-
+    std::cout<<"Request:\n"<<buffer<<"\n";
     HttpRequest request((std::string)(method), (std::string)(path), parseHeaders(buffer),(std::string)body, client_socket);
     
     return request;
@@ -169,6 +143,7 @@ void Server::serve() {
         }
     }
 }
+
 
 Server::~Server(){
     closesocket(_socket);

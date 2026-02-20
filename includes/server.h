@@ -16,6 +16,7 @@ class Server{
         bool startListening();
 
         HttpRequest createRequest();
+        Response createResponse(HttpRequest request, int statusCode = 200);
         void routeRequest(HttpRequest  request);
         void respondRequest(HttpRequest  request);
         void serve();

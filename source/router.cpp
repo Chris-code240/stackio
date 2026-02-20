@@ -5,14 +5,11 @@ void Router::addRoute(std::vector<std::string> methods, std::string path,Handler
     _routes.push_back(route);
 }
 
-Response Router::route(HttpRequest request){
-    Response res;
-    res.success = true;
-    res._body = "";
+void Router::route(HttpRequest request){
+
     Error error(404,{});
     bool validPath  = false;
     bool allowedMethod = false;
-    Route _route();
     for(Route route : _routes){
         if(route._path == request._path){
             validPath = true;
@@ -21,7 +18,7 @@ Response Router::route(HttpRequest request){
         }
 
         if (std::find(route._methods.begin(), route._methods.end(), request._method) != route._methods.end()){
-            if(validPath){route._handler._callBack(request); return res;}
+            if(validPath){route._handler._callBack(request); return;}
             allowedMethod = true;
         }else{
             allowedMethod = false;
@@ -43,6 +40,4 @@ Response Router::route(HttpRequest request){
     send(request.clientSocket,message.c_str(),(int)strlen(message.c_str()),0);
     closesocket(request.clientSocket);
 
-
-    return res;
 }

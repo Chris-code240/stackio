@@ -13,7 +13,7 @@ class Router{
 
         void addRoute(std::vector<std::string> methods, std::string path,Handler handler );
 
-        Response route(HttpRequest request);   
+        void route(HttpRequest request);   
 };
 
 

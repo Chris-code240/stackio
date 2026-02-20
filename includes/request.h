@@ -46,4 +46,50 @@ struct Response{
     bool success = false;
     std::string _body;
     std::vector<std::string> error;
+    int statusCode = 200;
+    bool isJsonResponse = true;
+    json _data;
+    Response(int code, json data = json::object(),bool isJsonRes = true): statusCode(code), _data(data), isJsonResponse(isJsonRes){
+
+    }
+    std::string dump(){
+        _body = "HTTP/1.1 " + std::to_string(statusCode) +" " + Errors.at(statusCode) + "\r\n";
+        if(isJsonResponse) _body += ("Content-Type: application/json\r\n");
+        else  _body += ("Content-Type: text/plain\r\n");
+        _body += "Content-Length: " + std::to_string(_data.dump().size()) + "\r\n";
+
+        if(_data.dump().size()){
+            _body += "\r\n" + _data.dump();
+        }
+        return _body;
+    }
 };
+
+
+inline std::unordered_map<std::string, std::string> parseHeaders(const std::string& request) {
+    std::unordered_map<std::string, std::string> headers;
+    std::stringstream stream(request);
+    std::string line;
+
+    if (!std::getline(stream, line)) return headers;
+
+    while (std::getline(stream, line) && line != "\r") {
+        size_t colonPos = line.find(':');
+        if (colonPos != std::string::npos) {
+            std::string key = line.substr(0, colonPos);
+            
+            // Extract the Value (skip the space after the colon)
+            std::string value = line.substr(colonPos + 1);
+
+            // Trim whitespace/carriage returns
+            if (!value.empty() && value.back() == '\r') value.pop_back();
+            if (!value.empty() && value.front() == ' ') value.erase(0, 1);
+
+            headers[key] = value;
+        }
+    }
+
+    return headers;
+}
+
+
