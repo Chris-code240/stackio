@@ -2,7 +2,7 @@
 #include <string>
 
 
-Server::Server(int port){
+Server::Server(Configuration config){
     WSADATA _wsa_data;
     int wsastart = WSAStartup(MAKEWORD(2,2), &_wsa_data);
     if(wsastart != 0){
@@ -16,7 +16,7 @@ Server::Server(int port){
         std::cout<<"[SERVER_ERROR] Socket Creation Error\n";
         std::exit(-1);
     }
-    _port = port;
+    _port = config._serverConfig._port;
 
     // bind socket
     _socket_address.sin_family = AF_INET;
@@ -37,11 +37,9 @@ Server::Server(int port){
         std::string message;
         if(pulledData.has_value()) {
             message = Response(200,json(pulledData)).dump();
-            std::cout<<"\nResponse:...\n"<<message<<"\n";
             send(request.value().clientSocket,message.c_str(),(int)strlen(message.c_str()),0);
         }else{
             message = Response(400,json("")).dump();
-            std::cout<<"\nResponse:...\n"<<message<<"\n";
             send(req.clientSocket,message.c_str(), (int)strlen(message.c_str()), 0);
         }
         closesocket(request.value().clientSocket);

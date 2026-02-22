@@ -1,9 +1,14 @@
 @echo off
 setlocal
-rd /s /q build
-if not exist build (
-    mkdir build
+
+:: Move to the directory where the .bat file is located
+cd /d "%~dp0"
+
+:: Clean and recreate build directory
+if exist build (
+    rd /s /q build
 )
+mkdir build
 
 cd build
 
@@ -16,7 +21,7 @@ if %errorlevel% neq 0 (
 )
 
 echo [BUILD] Building...
-cmake --build .
+cmake --build . --config Release
 if %errorlevel% neq 0 (
     echo [ERROR] Build failed.
     pause
@@ -24,7 +29,19 @@ if %errorlevel% neq 0 (
 )
 
 echo [SUCCESS] Running app...
-stackio.exe
-
+:: Go back to root so the relative path "./config.xml" works correctly
 cd ..
+
+:: Check if the exe is in build/ or build/Release/ (CMake behavior on Windows)
+if exist "build\Release\stackio.exe" (
+    "build\Release\stackio.exe" "config.xml"
+) else (
+    "build\stackio.exe" "config.xml"
+)
+
+if %errorlevel% neq 0 (
+    echo [ERROR] Application exited with code %errorlevel%
+)
+
+pause
 endlocal

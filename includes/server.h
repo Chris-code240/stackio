@@ -1,6 +1,7 @@
 
 #include "storage_engine.h"
 #include "router.h"
+#include "config.h"
 
 class Server{
     private:
@@ -11,7 +12,7 @@ class Server{
         StorageEngine _storageEngine;
         Router _router;
     public:
-        Server(int port);
+        Server(Configuration config);
         SOCKET acceptRequest();
         bool startListening();
 
