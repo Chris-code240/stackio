@@ -4,4 +4,19 @@
         <host>0.0.0.0</host>
         <threads>4</threads>
     </server>
+    <auth>
+        <enabled>1</enabled>
+        <token_expiry_minutes>60</token_expiry_minutes>
+        <secret>some_secret_key123</secret>
+    </auth>
+    <storage>
+        <data_dir>/</data_dir>
+        <flush_interval_ms>60</flush_interval_ms>
+        <snapshot_file>snapshot_file.dat</snapshot_file>
+        <wal_file>wal.log</wal_file>
+    </storage>
+    <api>
+        <max_body_size_kb>512</max_body_size_kb>
+        <rate_limit_per_minutes>60</rate_limit_per_minutes>
+    </api>
 </config>

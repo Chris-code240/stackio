@@ -11,7 +11,7 @@ Server::Server(Configuration config){
         std::exit(-1);
     }
     // create socket
-    this->_socket = socket(AF_INET, SOCK_STREAM, 0);
+    _socket = socket(AF_INET, SOCK_STREAM, 0);
     if(_socket == SOCKET_ERROR){
         std::cout<<"[SERVER_ERROR] Socket Creation Error\n";
         std::exit(-1);
@@ -26,7 +26,8 @@ Server::Server(Configuration config){
     if(bind(_socket, (struct sockaddr*)&_socket_address,sizeof(_socket_address)) == SOCKET_ERROR){
         std::cout<<"[SERVER_ERROR] Binding error\n";
         std::exit(-1);
-    } 
+    }
+    std::cout<<"Binding..\n"; 
     Handler getHandler("getHandler",[this](std::optional<HttpRequest> request){
         if(!request.has_value()) return;
         // take ID from request then grab data from the store
@@ -93,7 +94,7 @@ SOCKET Server::acceptRequest(){
 }
 
 bool Server::startListening(){
-    if (listen(_socket, 20) == SOCKET_ERROR) {
+    if (listen(_socket, SOMAXCONN) == SOCKET_ERROR) {
         std::exit(-1);
         return false;
     }
@@ -131,15 +132,50 @@ void Server::respondRequest(HttpRequest request){
 }
 void Server::serve() {
     startListening();
+    HANDLE epoll_fd = epoll_create1(0);
+    if(!(int)(epoll_fd) == -1){
+        std::perror("[SERVER_ERROR] epoll");
+        std::exit(-1);
+    }
+
+    struct epoll_event event;
+    event.events = EPOLLIN;
+    event.data.fd = _socket;
+
+    if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, _socket, &event) == -1) {
+        perror("epoll_ctl: listen_sock");
+        exit(EXIT_FAILURE);
+    }
 
     std::cout << ">>>> Server Is Live <<<<\n";
-    while (true) {
- 
-        const HttpRequest request = createRequest();
-        if(request.clientSocket) {
-            respondRequest(request);
+
+    struct epoll_event events[MAX_EVENTS];
+
+while (true) {
+    int num_fds = epoll_wait(epoll_fd, events, MAX_EVENTS, -1);
+
+    for (int n = 0; n < num_fds; ++n) {
+
+        if (events[n].data.fd == _socket) {
+
+            std::cout << "New client..\n";
+
+            socklen_t addrlen = sizeof(_socket_address);
+            int conn_sock = acceptRequest();
+            
+            event.events = EPOLLIN;
+            event.data.fd = conn_sock;
+            epoll_ctl(epoll_fd, EPOLL_CTL_ADD, conn_sock, &event);
+
+        } else {
+
+            HttpRequest request =  createRequest();
+            if(!request.clientSocket)continue;
+            routeRequest(request);
         }
     }
+}
+
 }
 
 

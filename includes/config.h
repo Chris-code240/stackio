@@ -103,7 +103,7 @@ struct Configuration{
             if(node.name() == "api"){
                 for(pugi::xml_node tag : node){
                     if(tag.name() == "max_body_size_kb") _apiConfig._max_body_size_kb = tag.text().as_int();
-                    if(tag.name() == "rate_limit_per_minute") _apiConfig._rate_limit_per_minute = tag.text().as_int();
+                    if(tag.name() == "rate_limit_per_minutes") _apiConfig._rate_limit_per_minute = tag.text().as_int();
                 }
             }
 
