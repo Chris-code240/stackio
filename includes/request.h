@@ -9,6 +9,7 @@
 #include "errors.h"
 #include <unordered_map>
 #include <sstream>
+#include "jwt-cpp/jwt.h"
 #pragma comment(lib, "Ws2_32.lib")
 
 using json = nlohmann::json;

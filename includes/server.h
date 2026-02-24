@@ -19,7 +19,7 @@ class Server{
         SOCKET acceptRequest();
         bool startListening();
 
-        HttpRequest createRequest();
+        HttpRequest createRequest(std::optional<int> clientSocket);
         Response createResponse(HttpRequest request, int statusCode = 200);
         void routeRequest(HttpRequest  request);
         void respondRequest(HttpRequest  request);

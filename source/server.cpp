@@ -71,6 +71,52 @@ Server::Server(Configuration config){
 
         closesocket(req.clientSocket);
     }));
+
+    _router.addRoute({"POST"}, "/token",Handler("postTokenHandler", [this](std::optional<HttpRequest> request){
+        if(!request.has_value()) return;
+     
+        HttpRequest  req = request.value();
+        std::cout<<"\nClient is: "<<req.clientSocket<<"\n";
+        try {
+            json data = req._body.size() ? json::parse(req._body) : json::parse("{}");
+            auto it = data.begin();
+            if(!it.key().size() || !it.value().size() || it.key() != "token"){
+                json res;
+                res["success"] = false;
+                res["message"] = "Invalid Request Data";
+                std::string message = Response(400,res).dump();
+                send(req.clientSocket, message.c_str(), (int)strlen(message.c_str()), 0);
+            }else{
+            // auto decoded = jwt::decode(it.value());
+
+            // verify the token that it is us who created it
+            // then send new one
+
+                auto newToken = jwt::create()
+                    .set_issuer("auth0")
+                    .set_type("JWS")
+                    .set_payload_claim("ID", jwt::claim(std::string("some_valid_id")))
+                    .set_issued_at(std::chrono::system_clock::now())
+                    .set_expires_at(std::chrono::system_clock::now() + std::chrono::seconds{3600});
+                std::string signed_token = newToken.sign(jwt::algorithm::hs256{"secret_key_here"});
+                json res = {{"token", signed_token}};
+                std::cout<<"Token: "<<signed_token<<"\n";
+                std::string message = Response(200, res).dump();
+
+                if(!send(req.clientSocket,message.c_str(), (int)strlen(message.c_str()), 0)){
+                    std::cout<<"\nMessage not sent\n";
+                }else{
+                    std::cout<<"\nMessage sent to socket: "<<req.clientSocket<<"\nMessage: \n"<<message<<"\n";
+                }
+        }
+        }
+        catch(const std::exception& e)
+        {
+            std::cerr <<"\nError: "<< e.what() << '\n';
+        }
+        
+        closesocket(req.clientSocket);
+    }));
 }
 
 
@@ -101,8 +147,8 @@ bool Server::startListening(){
     return true;
 }
 
-HttpRequest Server::createRequest(){
-    SOCKET client_socket = acceptRequest();
+HttpRequest Server::createRequest(std::optional<int> clientSocket){
+    SOCKET client_socket = clientSocket.has_value() ? clientSocket.value() : acceptRequest();
     if(client_socket == INVALID_SOCKET) {
         std::cout<<"Invalid client socket\n";
         return HttpRequest();
@@ -151,30 +197,30 @@ void Server::serve() {
 
     struct epoll_event events[MAX_EVENTS];
 
-while (true) {
-    int num_fds = epoll_wait(epoll_fd, events, MAX_EVENTS, -1);
+    while (true) {
+        int num_fds = epoll_wait(epoll_fd, events, MAX_EVENTS, -1);
 
-    for (int n = 0; n < num_fds; ++n) {
+        for (int n = 0; n < num_fds; ++n) {
 
-        if (events[n].data.fd == _socket) {
+            if (events[n].data.fd == _socket) {
 
-            std::cout << "New client..\n";
 
-            socklen_t addrlen = sizeof(_socket_address);
-            int conn_sock = acceptRequest();
-            
-            event.events = EPOLLIN;
-            event.data.fd = conn_sock;
-            epoll_ctl(epoll_fd, EPOLL_CTL_ADD, conn_sock, &event);
+                socklen_t addrlen = sizeof(_socket_address);
+                int conn_sock = acceptRequest();
+                
+                event.events = EPOLLIN;
+                event.data.fd = conn_sock;
+                epoll_ctl(epoll_fd, EPOLL_CTL_ADD, conn_sock, &event);
 
-        } else {
+            } else {
 
-            HttpRequest request =  createRequest();
-            if(!request.clientSocket)continue;
-            routeRequest(request);
+                HttpRequest request =  createRequest(events[n].data.fd);
+                std::cout<<"\nClient is: "<<events[n].data.fd<<"\n";
+
+                if(request.clientSocket)      routeRequest(request);
+            }
         }
     }
-}
 
 }
 

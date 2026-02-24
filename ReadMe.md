@@ -12,4 +12,4 @@
 +-----------------------------+
 
 
-curl -X POST http://127.0.0.1:8080 -H "Content-Type: application/json" -d "{\"key1\":\"value1\"}"
+curl -X POST http://127.0.0.1:8080/token -d "{\"token\":\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXUyJ9.eyJleHAiOjE3NzE5MzM5MjEsImlhdCI6MTc3MTkzMDMyMSwiaXNzIjoiYXV0aDAiLCJ1c2VyX2lkIjoiMTIzNDUifQ.eUdPIIbz1FGy7CtMeldQ3YEVvZLfKh1r5Vt-GJ4-X6I\"}" -H "Content-Type: application/json"
