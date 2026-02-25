@@ -1,8 +1,52 @@
 #include "../includes/server.h"
 #include <string>
 
+void Server::generateAuthCredentials(){
+    // generate token and ID
+    uint32_t id = reinterpret_cast<uint32_t>(&_config);
+    auto token = jwt::create()
+                    .set_issuer("auth0")
+                    .set_type("JWS")
+                    .set_payload_claim("ID", jwt::claim(std::string(std::to_string(id))))
+                    .set_issued_at(std::chrono::system_clock::now())
+                    .set_expires_at(std::chrono::system_clock::now() + std::chrono::seconds{3600});
+                std::string signed_token = token.sign(jwt::algorithm::hs256{_config._authConfig._secret});
+    std::ofstream authFile;
+    json data = {{"ID", id}, {"token", signed_token}};
+    authFile.open("auth.json");
+    if(authFile.is_open()){
+        authFile <<data.dump(4);
+        authFile.close();
+    }
+}
 
-Server::Server(Configuration config){
+void Server::verifyRequest(HttpRequest request){
+    // check headers for Content-Type == application/json
+    if(request._headers.find("Content-Type") == request._headers.end() || request._headers["Content-Type"] != "application/json"){
+        throw "Request must be JSON";
+    }
+
+    if(_config._authConfig._enabled){
+        if(request._headers.find("Authorization") == request._headers.end() ||request._headers["Authorization"].substr(0,7) != "bearer ")
+        throw "Invalid Authorization";
+
+        else{
+            // verify token
+            std::string token = request._headers["Authorization"].substr(7, request._headers["Authorization"].size() - 7);
+
+           auto verifier = jwt::verify()
+                    .allow_algorithm(jwt::algorithm::hs256{_config._authConfig._secret})
+                    .with_issuer("auth0");
+                auto decoded = jwt::decode(token);
+                verifier.verify(decoded);
+
+                // check if its expired
+        }
+    }
+
+}
+
+Server::Server(Configuration config): _config(config){
     WSADATA _wsa_data;
     int wsastart = WSAStartup(MAKEWORD(2,2), &_wsa_data);
     if(wsastart != 0){
@@ -17,7 +61,9 @@ Server::Server(Configuration config){
         std::exit(-1);
     }
     _port = config._serverConfig._port;
-
+    //
+    generateAuthCredentials();
+    //
     // bind socket
     _socket_address.sin_family = AF_INET;
     _socket_address.sin_port = htons(_port);
@@ -33,6 +79,7 @@ Server::Server(Configuration config){
         // take ID from request then grab data from the store
 
         HttpRequest req = request.value();
+        std::cout<<"Request: GET : \n"<<req._body<<"\n";
         std::optional<std::string> pulledData = _storageEngine.get(req._path.substr(1));
         // send data to client
         std::string message;
@@ -74,9 +121,14 @@ Server::Server(Configuration config){
 
     _router.addRoute({"POST"}, "/token",Handler("postTokenHandler", [this](std::optional<HttpRequest> request){
         if(!request.has_value()) return;
+        if(!_config._authConfig._enabled){
+            std::cout<<"Auth not enabled\n";
+            closesocket(request.value().clientSocket);
+            return;
+        }
      
         HttpRequest  req = request.value();
-        std::cout<<"\nClient is: "<<req.clientSocket<<"\n";
+        std::string message;
         try {
             json data = req._body.size() ? json::parse(req._body) : json::parse("{}");
             auto it = data.begin();
@@ -85,36 +137,34 @@ Server::Server(Configuration config){
                 res["success"] = false;
                 res["message"] = "Invalid Request Data";
                 std::string message = Response(400,res).dump();
-                send(req.clientSocket, message.c_str(), (int)strlen(message.c_str()), 0);
+                send(req.clientSocket,message.c_str(), (int)strlen(message.c_str()), 0);
             }else{
-            // auto decoded = jwt::decode(it.value());
+                // decode and verify token
+                // then send new one upon success
 
-            // verify the token that it is us who created it
-            // then send new one
-
+                auto verifier = jwt::verify()
+                    .allow_algorithm(jwt::algorithm::hs256{_config._authConfig._secret})
+                    .with_issuer("auth0");
+                auto decoded = jwt::decode(it.value());
+                verifier.verify(decoded);
                 auto newToken = jwt::create()
                     .set_issuer("auth0")
                     .set_type("JWS")
                     .set_payload_claim("ID", jwt::claim(std::string("some_valid_id")))
                     .set_issued_at(std::chrono::system_clock::now())
                     .set_expires_at(std::chrono::system_clock::now() + std::chrono::seconds{3600});
-                std::string signed_token = newToken.sign(jwt::algorithm::hs256{"secret_key_here"});
+                std::string signed_token = newToken.sign(jwt::algorithm::hs256{_config._authConfig._secret});
                 json res = {{"token", signed_token}};
-                std::cout<<"Token: "<<signed_token<<"\n";
-                std::string message = Response(200, res).dump();
+                message = Response(200, res).dump();
+  
+            }
+        }
+        catch(const std::exception& e){
 
-                if(!send(req.clientSocket,message.c_str(), (int)strlen(message.c_str()), 0)){
-                    std::cout<<"\nMessage not sent\n";
-                }else{
-                    std::cout<<"\nMessage sent to socket: "<<req.clientSocket<<"\nMessage: \n"<<message<<"\n";
-                }
+            message = Response(400, json({{"message", e.what()}})).dump();
         }
-        }
-        catch(const std::exception& e)
-        {
-            std::cerr <<"\nError: "<< e.what() << '\n';
-        }
-        
+        std::cout<<message<<"";
+        send(req.clientSocket,message.c_str(), (int)strlen(message.c_str()), 0);
         closesocket(req.clientSocket);
     }));
 }
@@ -123,13 +173,13 @@ Server::Server(Configuration config){
 void Server::routeRequest(HttpRequest request){
 
     for(auto route : _router._routes){
-        std::cout<<std::regex_match(request._path, std::regex(route._path))<<" - " <<route._path<<" - ";
         if(std::regex_match(request._path, std::regex(route._path)) && std::find(route._methods.begin(), route._methods.end(), request._method) != route._methods.end()){
             route._handler._callBack(request);
             return;
         }
-        closesocket(request.clientSocket);
     }
+    closesocket(request.clientSocket);
+
 
 }
 
@@ -166,7 +216,6 @@ HttpRequest Server::createRequest(std::optional<int> clientSocket){
     if (body) {
         body += 4; // Move pointer past the \r\n\r\n
     }
-    std::cout<<"Request:\n"<<buffer<<"\n";
     HttpRequest request((std::string)(method), (std::string)(path), parseHeaders(buffer),(std::string)body, client_socket);
     
     return request;
@@ -193,7 +242,7 @@ void Server::serve() {
         exit(EXIT_FAILURE);
     }
 
-    std::cout << ">>>> Server Is Live <<<<\n";
+    std::cout << "\n>>>> Server Is Live <<<<\n";
 
     struct epoll_event events[MAX_EVENTS];
 
@@ -213,10 +262,7 @@ void Server::serve() {
                 epoll_ctl(epoll_fd, EPOLL_CTL_ADD, conn_sock, &event);
 
             } else {
-
                 HttpRequest request =  createRequest(events[n].data.fd);
-                std::cout<<"\nClient is: "<<events[n].data.fd<<"\n";
-
                 if(request.clientSocket)      routeRequest(request);
             }
         }

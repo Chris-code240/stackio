@@ -25,7 +25,10 @@ struct storageConfig{
     std::string _wal_file;
     std::string _snapshot_file;
     int _flush_interval_ms;
-    storageConfig(std::string data_dir = "./data",std::string wal_file = "wal.log", std::string snapshot_file = "snapshot.dat", int flust_interval = 5000): _data_dir(data_dir), _wal_file(wal_file), _snapshot_file(snapshot_file), _flush_interval_ms(5000){}
+    storageConfig(std::string data_dir = "./data",
+                std::string wal_file = "wal.log", 
+                std::string snapshot_file = "snapshot.dat", 
+                int flust_interval = 5000): _data_dir(data_dir), _wal_file(wal_file), _snapshot_file(snapshot_file), _flush_interval_ms(5000){}
 };
 /*
 auth:
@@ -77,33 +80,36 @@ struct Configuration{
             std::exit(-1);
         }
         for(pugi::xml_node node : doc.child("config")){
+            std::cout<<node.name()<<" -> "<<std::regex_match("api", std::regex(node.name()))<<"\n";
             if(node.name() == "storage"){
                 for(pugi::xml_node tag : node){
-                    if(tag.name() == "data_dir") _storageConfig._data_dir = tag.text().as_string();
-                    if(tag.name() == "flush_interval_ms") _storageConfig._flush_interval_ms = tag.text().as_int();
-                    if(tag.name() == "snapshot_file") _storageConfig._snapshot_file = tag.text().as_string();
-                    if(tag.name() == "wal_file") _storageConfig._wal_file = tag.text().as_string();
+                    if(std::regex_match("data_dir", std::regex(tag.name()))) _storageConfig._data_dir = tag.text().as_string();
+                    if(std::regex_match("flush_interval_ms", std::regex(tag.name()))) _storageConfig._flush_interval_ms = tag.text().as_int();
+                    if(std::regex_match("snapshot_file", std::regex(tag.name()))) _storageConfig._snapshot_file = tag.text().as_string();
+                    if(std::regex_match("wal_file", std::regex(tag.name()))) _storageConfig._wal_file = tag.text().as_string();
                 }
             }
-            if(node.name() == "server"){
+            if(std::regex_match("server", std::regex(node.name()))){
                 for(pugi::xml_node tag : node){
-                    if(tag.name() == "threads") _serverConfig._threads = tag.text().as_int();
-                    if(tag.name() == "port") _serverConfig._port = tag.text().as_int();
-                    if(tag.name() == "host") _serverConfig._host = tag.text().as_string();
+                    if(std::regex_match("threads", std::regex(tag.name()))) _serverConfig._threads = tag.text().as_int();
+                    if(std::regex_match("port", std::regex(tag.name()))) _serverConfig._port = tag.text().as_int();
+                    if(std::regex_match("host", std::regex(tag.name()))) _serverConfig._host = tag.text().as_string();
                 }
             }
-            if(node.name() == "auth"){
+            if(std::regex_match("auth", std::regex(node.name()))){
                 for(pugi::xml_node tag : node){
-                    if(tag.name() == "enabled") _authConfig._enabled = tag.text().as_bool();
-                    if(tag.name() == "secret") _authConfig._secret = tag.text().as_string();
-                    if(tag.name() == "token_expiry_minutes") _authConfig._token_expiry_minutes = tag.text().as_int();
+                    if(std::regex_match("enabled", std::regex(tag.name()))){ _authConfig._enabled = tag.text().as_bool(); std::cout<<"Auth is "<<tag.text();}
+                    if(std::regex_match("secret", std::regex(tag.name()))) _authConfig._secret = tag.text().as_string();
+                    if(std::regex_match("token_expiry_minutes", std::regex(tag.name()))) _authConfig._token_expiry_minutes = tag.text().as_int();
 
                 }
             }
-            if(node.name() == "api"){
+            if(std::regex_match("api", std::regex(node.name()))){
+
                 for(pugi::xml_node tag : node){
-                    if(tag.name() == "max_body_size_kb") _apiConfig._max_body_size_kb = tag.text().as_int();
-                    if(tag.name() == "rate_limit_per_minutes") _apiConfig._rate_limit_per_minute = tag.text().as_int();
+
+                    if(std::regex_match("max_body_size_kb", std::regex(tag.name())) ) _apiConfig._max_body_size_kb = tag.text().as_int();
+                    if(std::regex_match("rate_limit_per_minutes", std::regex(tag.name())) ) _apiConfig._rate_limit_per_minute = tag.text().as_int();
                 }
             }
 

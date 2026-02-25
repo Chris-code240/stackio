@@ -36,7 +36,7 @@ cd ..
 if exist "build\Release\stackio.exe" (
     "build\Release\stackio.exe" "config.xml"
 ) else (
-    "build\stackio.exe" "config.xml"
+    "build\stackio.exe" "./config.xml"
 )
 
 if %errorlevel% neq 0 (
