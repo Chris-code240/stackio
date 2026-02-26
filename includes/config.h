@@ -39,6 +39,7 @@ struct authConfig {
     bool _enabled;
     std::string _secret;
     int _token_expiry_minutes;
+    uint32_t _ID;
     authConfig():_enabled(false){}
     authConfig(std::string secret, int token_expiry_minutes = 60, bool enabled = true) : _secret(secret), _token_expiry_minutes(token_expiry_minutes), _enabled(enabled){}
 };

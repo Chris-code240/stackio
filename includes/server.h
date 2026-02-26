@@ -4,6 +4,9 @@
 #include "config.h"
 #include "wepoll.h"
 #include <fstream>
+#include <algorithm>
+#include <cctype>
+#include <string>
 #pragma comment(lib, "ws2_32.lib")
 
 #define MAX_EVENTS 10
@@ -28,7 +31,7 @@ class Server{
         void serve();
         void replayWAL();
         void generateAuthCredentials();
-        void verifyRequest(HttpRequest request)
+        void verifyRequest(HttpRequest request);
         ~Server();
         // _storageEngine.
 

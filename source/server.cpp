@@ -10,7 +10,7 @@ void Server::generateAuthCredentials(){
                     .set_payload_claim("ID", jwt::claim(std::string(std::to_string(id))))
                     .set_issued_at(std::chrono::system_clock::now())
                     .set_expires_at(std::chrono::system_clock::now() + std::chrono::seconds{3600});
-                std::string signed_token = token.sign(jwt::algorithm::hs256{_config._authConfig._secret});
+    std::string signed_token = token.sign(jwt::algorithm::hs256{_config._authConfig._secret});
     std::ofstream authFile;
     json data = {{"ID", id}, {"token", signed_token}};
     authFile.open("auth.json");
@@ -18,32 +18,55 @@ void Server::generateAuthCredentials(){
         authFile <<data.dump(4);
         authFile.close();
     }
+    _config._authConfig._ID = id;
 }
 
-void Server::verifyRequest(HttpRequest request){
-    // check headers for Content-Type == application/json
-    if(request._headers.find("Content-Type") == request._headers.end() || request._headers["Content-Type"] != "application/json"){
-        throw "Request must be JSON";
+
+std::optional<std::string> getHeader(const HttpRequest& request, std::string key) {
+    if (request._headers.empty()) return std::nullopt;
+
+    std::transform(key.begin(), key.end(), key.begin(), ::tolower);
+
+    for (const auto& [k, v] : request._headers) {
+        std::string lowerK = k;
+        std::transform(lowerK.begin(), lowerK.end(), lowerK.begin(), ::tolower);
+        
+        if (lowerK == key) return v;
     }
 
-    if(_config._authConfig._enabled){
-        if(request._headers.find("Authorization") == request._headers.end() ||request._headers["Authorization"].substr(0,7) != "bearer ")
-        throw "Invalid Authorization";
+    return std::nullopt; 
+}
+void Server::verifyRequest(HttpRequest request) {
+    if (request._headers.empty()) {
+        throw std::runtime_error("Invalid Request: No headers");
+    }
 
-        else{
-            // verify token
-            std::string token = request._headers["Authorization"].substr(7, request._headers["Authorization"].size() - 7);
+    auto contentType = getHeader(request, "Content-Type");
+    if (!contentType.has_value() || contentType.value() != "application/json") {
+        throw std::runtime_error("Invalid Request Type");
+    }
 
-           auto verifier = jwt::verify()
-                    .allow_algorithm(jwt::algorithm::hs256{_config._authConfig._secret})
-                    .with_issuer("auth0");
-                auto decoded = jwt::decode(token);
-                verifier.verify(decoded);
-
-                // check if its expired
+    if (_config._authConfig._enabled) {
+        auto authOpt = getHeader(request, "Authorization");
+        if (!authOpt.has_value()) {
+            throw std::runtime_error("Authorization header missing");
         }
-    }
 
+        std::string auth = authOpt.value();
+        
+        std::string prefix = "bearer ";
+        if (auth.size() <= prefix.size() || auth.substr(0, prefix.size()) != prefix) {
+            throw std::runtime_error("Invalid Authorization: Token type");
+        }
+
+        std::string token = auth.substr(prefix.size());
+        
+        auto verifier = jwt::verify()
+                .allow_algorithm(jwt::algorithm::hs256{_config._authConfig._secret})
+                .with_issuer("auth0");
+        auto decoded = jwt::decode(token);
+        verifier.verify(decoded); // This throws if verification fails
+    }
 }
 
 Server::Server(Configuration config): _config(config){
@@ -73,7 +96,7 @@ Server::Server(Configuration config): _config(config){
         std::cout<<"[SERVER_ERROR] Binding error\n";
         std::exit(-1);
     }
-    std::cout<<"Binding..\n"; 
+
     Handler getHandler("getHandler",[this](std::optional<HttpRequest> request){
         if(!request.has_value()) return;
         // take ID from request then grab data from the store
@@ -99,21 +122,26 @@ Server::Server(Configuration config): _config(config){
 
     _router.addRoute({"POST"}, "/",Handler("postHandler",[this](std::optional<HttpRequest> request){
 
-        if(!request.has_value()) return;
+        if(!request.has_value()) { std::cout<<"No req value\n";return;}
         HttpRequest req = request.value();
-        if(!req.clientSocket) return;
+        if(!req.clientSocket) {std::cout<<"No client\n";return;}
         // for debugging purpose
         try{
+            verifyRequest(req);
             json data = req._body.size() ? json::parse(req._body) : json::parse("{}");
+            if(!data.size()) throw std::runtime_error("Empty Data");
             auto it = data.begin();
             _storageEngine.set(it.key(), it.value());
-            json res;
-            res["success"] = true;
-            std::string message = req.prepareMessage(res.dump());
+            
+            std::string message = Response(200,json({{"success", true}})).dump();
             send(req.clientSocket,message.c_str(),(int)strlen(message.c_str()), 0);
 
         }catch(std::exception e){
-            std::cout<<"Error: "<<e.what()<<"\n";
+            std::string message = Response(400, json({{"message", e.what()}})).dump();
+            send(req.clientSocket, message.c_str(), (int)strlen(message.c_str()), 0);
+        }catch(...){
+            std::string message = Response(400, json({{"message","Honestly have no idea LOL"}})).dump();
+            send(req.clientSocket, message.c_str(), (int)strlen(message.c_str()), 0);
         }
 
         closesocket(req.clientSocket);
@@ -144,13 +172,15 @@ Server::Server(Configuration config): _config(config){
 
                 auto verifier = jwt::verify()
                     .allow_algorithm(jwt::algorithm::hs256{_config._authConfig._secret})
-                    .with_issuer("auth0");
+                    .with_issuer("auth0")
+                    .leeway(259200);
+
                 auto decoded = jwt::decode(it.value());
                 verifier.verify(decoded);
                 auto newToken = jwt::create()
                     .set_issuer("auth0")
                     .set_type("JWS")
-                    .set_payload_claim("ID", jwt::claim(std::string("some_valid_id")))
+                    .set_payload_claim("ID", jwt::claim(std::string(std::to_string(_config._authConfig._ID))))
                     .set_issued_at(std::chrono::system_clock::now())
                     .set_expires_at(std::chrono::system_clock::now() + std::chrono::seconds{3600});
                 std::string signed_token = newToken.sign(jwt::algorithm::hs256{_config._authConfig._secret});
@@ -217,7 +247,7 @@ HttpRequest Server::createRequest(std::optional<int> clientSocket){
         body += 4; // Move pointer past the \r\n\r\n
     }
     HttpRequest request((std::string)(method), (std::string)(path), parseHeaders(buffer),(std::string)body, client_socket);
-    
+    // std::cout<<"\n"<<buffer<<"\n";
     return request;
 }
 
