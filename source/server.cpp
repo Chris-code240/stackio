@@ -70,6 +70,7 @@ void Server::verifyRequest(HttpRequest request) {
 }
 
 Server::Server(Configuration config): _config(config){
+    _config = config;
     WSADATA _wsa_data;
     int wsastart = WSAStartup(MAKEWORD(2,2), &_wsa_data);
     if(wsastart != 0){
@@ -84,6 +85,8 @@ Server::Server(Configuration config): _config(config){
         std::exit(-1);
     }
     _port = config._serverConfig._port;
+    _storageEngine._walFilePath = config._storageConfig._wal_file;
+
     //
     generateAuthCredentials();
     //
@@ -126,21 +129,23 @@ Server::Server(Configuration config): _config(config){
         HttpRequest req = request.value();
         if(!req.clientSocket) {std::cout<<"No client\n";return;}
         // for debugging purpose
+        std::string message, writeAheadMessage;
         try{
             verifyRequest(req);
             json data = req._body.size() ? json::parse(req._body) : json::parse("{}");
             if(!data.size()) throw std::runtime_error("Empty Data");
             auto it = data.begin();
             _storageEngine.set(it.key(), it.value());
-            
-            std::string message = Response(200,json({{"success", true}})).dump();
+                // lets test the writeToFile()
+            writeAheadMessage = _storageEngine.writeAhead(json({{"op","SET"}, {"key", it.key()}, {"value", it.value()}})).dump();
+            message = Response(200,json({{"success", true}})).dump();
             send(req.clientSocket,message.c_str(),(int)strlen(message.c_str()), 0);
 
         }catch(std::exception e){
-            std::string message = Response(400, json({{"message", e.what()}})).dump();
+            message = Response(400, json({{"message", e.what()}})).dump();
             send(req.clientSocket, message.c_str(), (int)strlen(message.c_str()), 0);
         }catch(...){
-            std::string message = Response(400, json({{"message","Honestly have no idea LOL"}})).dump();
+            message = Response(400, json({{"message","Honestly have no idea LOL"}})).dump();
             send(req.clientSocket, message.c_str(), (int)strlen(message.c_str()), 0);
         }
 

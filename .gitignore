@@ -4,3 +4,4 @@ build/*
 *.py
 external/
 *.rest
+data/

@@ -13,7 +13,7 @@
         <data_dir>/</data_dir>
         <flush_interval_ms>60</flush_interval_ms>
         <snapshot_file>snapshot_file.dat</snapshot_file>
-        <wal_file>wal.log</wal_file>
+        <wal_file>wal.json</wal_file>
     </storage>
     <api>
         <max_body_size_kb>512</max_body_size_kb>

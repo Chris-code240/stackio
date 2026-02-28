@@ -2,7 +2,7 @@
 #include <string>
 #include <fstream>
 #include <vector>
-// #include "../external/rapidyaml-master/src/c4/yml/yml.hpp"
+#include <filesystem>
 #include "pugixml.hpp"
 struct serverConfig{
     int _port;
@@ -12,29 +12,28 @@ struct serverConfig{
     serverConfig(std::string host, int port, int threads): _host(host), _port(port), _threads(threads){}
 };
 
-/*
-storage:
-  data_dir: "./data"
-  wal_file: "wal.log"
-  snapshot_file: "snapshot.dat"
-  flush_interval_ms: 5000
-*/
 struct storageConfig{
 
     std::string _data_dir;
     std::string _wal_file;
     std::string _snapshot_file;
     int _flush_interval_ms;
-    storageConfig(std::string data_dir = "./data",
-                std::string wal_file = "wal.log", 
+    storageConfig(std::string data_dir = "data",
+                std::string wal_file = "wal.json", 
                 std::string snapshot_file = "snapshot.dat", 
-                int flust_interval = 5000): _data_dir(data_dir), _wal_file(wal_file), _snapshot_file(snapshot_file), _flush_interval_ms(5000){}
+                int flust_interval = 5000): _data_dir(data_dir), _wal_file(wal_file), _snapshot_file(snapshot_file), _flush_interval_ms(5000){
+                    std::filesystem::path p = data_dir;
+                    p /= wal_file;
+                    _wal_file = p.string();
+                   
+                    //snapshot file
+
+                    p = data_dir;
+                    p /= snapshot_file;
+                    _snapshot_file = p.string();
+                }
 };
-/*
-auth:
-  enabled: true
-  jwt_secret: "change_me"
-  token_expiry_minutes: 60*/
+
 struct authConfig {
     bool _enabled;
     std::string _secret;
@@ -52,7 +51,8 @@ struct apiConfig {
     int _max_body_size_kb;
     int _rate_limit_per_minute;
 
-    apiConfig(int max_body_size_kb = 512, int rate_limit_per_minute = 60) : _max_body_size_kb(max_body_size_kb), _rate_limit_per_minute(rate_limit_per_minute) {}
+    apiConfig(int max_body_size_kb = 512, int rate_limit_per_minute = 60) : _max_body_size_kb(max_body_size_kb), _rate_limit_per_minute(rate_limit_per_minute) {
+    }
 };
 struct Configuration{
     serverConfig _serverConfig;
