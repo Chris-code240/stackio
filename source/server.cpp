@@ -152,6 +152,31 @@ Server::Server(Configuration config): _config(config){
         closesocket(req.clientSocket);
     }));
 
+    _router.addRoute({"DELETE"}, "/?[A-Za-z0-9]+", Handler("deleteHandler",[this](std::optional<HttpRequest> request){
+        if(!request.has_value()) return;
+
+        HttpRequest req = request.value();
+
+        verifyRequest(req);
+        std::string message;
+
+        try{
+            _storageEngine.pop(req._path.substr(1));
+            message = Response(301,json({{"success", true}, {"message", "Data deleted"}})).dump();
+            send(req.clientSocket,message.c_str(),(int)strlen(message.c_str()), 0);
+        }catch(std::exception e){
+            message = Response(400,json({{"success", false}, {"message", e.what()}})).dump();
+
+            send(req.clientSocket,message.c_str(),(int)strlen(message.c_str()), 0);
+
+        }catch(...){
+            message = Response(400,json({{"success", false}, {"message", "Unknown Error"}})).dump();
+
+            send(req.clientSocket,message.c_str(),(int)strlen(message.c_str()), 0);
+        }
+        closesocket(req.clientSocket);
+    }));
+
     _router.addRoute({"POST"}, "/token",Handler("postTokenHandler", [this](std::optional<HttpRequest> request){
         if(!request.has_value()) return;
         if(!_config._authConfig._enabled){
@@ -277,15 +302,16 @@ void Server::serve() {
         exit(EXIT_FAILURE);
     }
 
-    std::cout << "\n>>>> Server Is Live <<<<\n";
-
+    std::cout << "\n>>>> Server Is Live <<<<\n"<<"\t[-] Find auth credentials in auth.json\n";
     struct epoll_event events[MAX_EVENTS];
 
+    auto now = std::chrono::system_clock::now();
+    auto duration = now.time_since_epoch();
     while (true) {
         int num_fds = epoll_wait(epoll_fd, events, MAX_EVENTS, -1);
 
         for (int n = 0; n < num_fds; ++n) {
-
+            
             if (events[n].data.fd == _socket) {
 
 
@@ -301,6 +327,12 @@ void Server::serve() {
                 if(request.clientSocket)      routeRequest(request);
             }
         }
+        
+        auto millis = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
+        if(millis % _config._storageConfig._flush_interval_ms){
+            _storageEngine.writeAhead(NULL);
+        }
+
     }
 
 }
