@@ -8,6 +8,8 @@
 #include <io.h>      
 #include <fcntl.h>   
 #include <stdio.h> 
+#include <set>
+#include <fstream>
 using json = nlohmann::json;
 class StorageEngine{
 
@@ -23,4 +25,6 @@ class StorageEngine{
             std::optional<std::string> get(const std::string & key);
             void pop(const std::string &key);
             json writeAhead(std::optional<json> data);
+
+            void replay();
 };

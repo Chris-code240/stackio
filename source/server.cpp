@@ -157,12 +157,12 @@ Server::Server(Configuration config): _config(config){
 
         HttpRequest req = request.value();
 
-        verifyRequest(req);
         std::string message;
 
         try{
+             verifyRequest(req);
             _storageEngine.pop(req._path.substr(1));
-            message = Response(301,json({{"success", true}, {"message", "Data deleted"}})).dump();
+            message = Response(200,json({{"success", true}, {"message", "Data deleted"}})).dump();
             send(req.clientSocket,message.c_str(),(int)strlen(message.c_str()), 0);
         }catch(std::exception e){
             message = Response(400,json({{"success", false}, {"message", e.what()}})).dump();
@@ -227,6 +227,10 @@ Server::Server(Configuration config): _config(config){
         send(req.clientSocket,message.c_str(), (int)strlen(message.c_str()), 0);
         closesocket(req.clientSocket);
     }));
+
+    // replay()
+
+    _storageEngine.replay();
 }
 
 
@@ -258,27 +262,36 @@ bool Server::startListening(){
 }
 
 HttpRequest Server::createRequest(std::optional<int> clientSocket){
-    SOCKET client_socket = clientSocket.has_value() ? clientSocket.value() : acceptRequest();
-    if(client_socket == INVALID_SOCKET) {
-        std::cout<<"Invalid client socket\n";
+    
+    try{
+        SOCKET client_socket = clientSocket.has_value() ? clientSocket.value() : acceptRequest();
+        if(client_socket == INVALID_SOCKET) {
+            std::cout<<"Invalid client socket\n";
+            return HttpRequest();
+        }
+
+        const int bufferSize = 20000;
+        char buffer[bufferSize]{0};
+        int bytesReceived = recv(client_socket, buffer, bufferSize - 1, 0);
+        if(!bytesReceived) return HttpRequest();
+        // lets read request properties [method, path, body,...hederas like content-type later]
+        char method[10], path[255], protocol[20];
+        sscanf(buffer, "%s %s %s", method, path, protocol);
+
+        char *body = strstr(buffer, "\r\n\r\n");
+        if (body) {
+            body += 4; // Move pointer past the \r\n\r\n
+        }
+        HttpRequest request((std::string)(method), (std::string)(path), parseHeaders(buffer),(std::string)body, client_socket);
+        // std::cout<<"\n"<<buffer<<"\n";
+        return request;
+    }
+    catch(const std::exception& e)
+    {
+        std::cerr << e.what() << '\n';
         return HttpRequest();
     }
-
-    const int bufferSize = 20000;
-    char buffer[bufferSize]{0};
-    int bytesReceived = recv(client_socket, buffer, bufferSize - 1, 0);
-    if(!bytesReceived) return HttpRequest();
-    // lets read request properties [method, path, body,...hederas like content-type later]
-    char method[10], path[255], protocol[20];
-    sscanf(buffer, "%s %s %s", method, path, protocol);
-
-    char *body = strstr(buffer, "\r\n\r\n");
-    if (body) {
-        body += 4; // Move pointer past the \r\n\r\n
-    }
-    HttpRequest request((std::string)(method), (std::string)(path), parseHeaders(buffer),(std::string)body, client_socket);
-    // std::cout<<"\n"<<buffer<<"\n";
-    return request;
+    
 }
 
 void Server::respondRequest(HttpRequest request){
@@ -330,6 +343,7 @@ void Server::serve() {
         
         auto millis = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
         if(millis % _config._storageConfig._flush_interval_ms){
+            std::cout<<"\nWAL in sesssion\n";
             _storageEngine.writeAhead(NULL);
         }
 
