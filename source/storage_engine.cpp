@@ -4,9 +4,17 @@ void StorageEngine::set(const std::string &key, const std::string &value){
     std::lock_guard<std::mutex> lock(store_mutex);
     auto it = store.find(key);
     if(it != store.end() && it->second != value){
+        std::cout<<"Key exits but value has changed from "<<it->second<<" to "<<value<<"\n";
          keys.push_back(key);
          std::set<std::string> s(keys.begin(),keys.end());
          keys = std::vector<std::string>(s.begin(), s.end());
+    }else if(it == store.end()){
+        std::cout<<"Key doesnt exit..appending..\n";
+        for(auto [k,v]: store)std::cout<<"key: "<<k<<" - "<<v<<" ";
+        std::cout<<"\n";
+        keys.push_back(key);
+        std::set<std::string> s(keys.begin(),keys.end());
+        keys = std::vector<std::string>(s.begin(), s.end());
     }
     
     store[key] = value;
@@ -26,9 +34,14 @@ void StorageEngine::pop(const std::string &key){
 
     auto it = store.find(key);
     if(it != store.end()) {
+        deleted.push_back(it->first);
+        std::set<std::string> s(deleted.begin(), deleted.end());
+        deleted = std::vector<std::string>(s.begin(), s.end());
+        
         store.erase(key);
         auto it2 = std::find(keys.begin(), keys.end(), key);
         if(it2 != keys.end())keys.erase(it2);
+
     }
     else{
         throw std::runtime_error("Invalid key");
@@ -60,7 +73,11 @@ json StorageEngine::writeAhead(std::optional<json> data) {
     for( auto k : keys){
         payload += (json({{"key", k}, {"value", store[k]}, {"op", "SET"}}).dump() + "\n");
     }
+    for( auto k : deleted){
+        payload += (json({{"key", k}, {"value", store[k]}, {"op", "DELETE"}}).dump() + "\n");
+    }
     keys.clear(); // reset keys
+    deleted.clear(); // reset
 
     if(_write(fileDescriptor, payload.c_str(), (unsigned int)payload.length()) == -1) {
         _close(fileDescriptor);

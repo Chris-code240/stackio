@@ -17,6 +17,7 @@ class StorageEngine{
         std::unordered_map<std::string, std::string> store;
         std::mutex store_mutex;
         std::vector<std::string> keys;
+        std::vector<std::string> deleted;
         public:
             std::string _walFilePath;
             int startIndex = 0;

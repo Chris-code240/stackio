@@ -229,8 +229,10 @@ Server::Server(Configuration config): _config(config){
     }));
 
     // replay()
-
+    std::cout<<"[SERVER] Replaying...";
     _storageEngine.replay();
+    std::cout<<"[DONE]\n";
+
 }
 
 
