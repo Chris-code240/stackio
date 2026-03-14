@@ -69,7 +69,7 @@ void Server::verifyRequest(HttpRequest request) {
     }
 }
 
-Server::Server(Configuration config): _config(config){
+Server::Server(Configuration config): _config(config), _reqguard(config._apiConfig){
     _config = config;
     WSADATA _wsa_data;
     int wsastart = WSAStartup(MAKEWORD(2,2), &_wsa_data);
@@ -237,7 +237,13 @@ Server::Server(Configuration config): _config(config){
 
 
 void Server::routeRequest(HttpRequest request){
-
+    json data = _reqguard.examineRequest(request);
+    if(!data.at("allow")){
+        std::string message = Response(429,data).dump();
+        send(request.clientSocket,message.c_str(),(int)strlen(message.c_str()), 0);
+        closesocket(request.clientSocket);
+        return;
+    }
     for(auto route : _router._routes){
         if(std::regex_match(request._path, std::regex(route._path)) && std::find(route._methods.begin(), route._methods.end(), request._method) != route._methods.end()){
             route._handler._callBack(request);
@@ -245,8 +251,6 @@ void Server::routeRequest(HttpRequest request){
         }
     }
     closesocket(request.clientSocket);
-
-
 }
 
 SOCKET Server::acceptRequest(){
@@ -265,6 +269,8 @@ bool Server::startListening(){
 
 HttpRequest Server::createRequest(std::optional<int> clientSocket){
     
+    
+
     try{
         SOCKET client_socket = clientSocket.has_value() ? clientSocket.value() : acceptRequest();
         if(client_socket == INVALID_SOCKET) {
@@ -272,6 +278,8 @@ HttpRequest Server::createRequest(std::optional<int> clientSocket){
             return HttpRequest();
         }
 
+
+        // Read data
         const int bufferSize = 20000;
         char buffer[bufferSize]{0};
         int bytesReceived = recv(client_socket, buffer, bufferSize - 1, 0);

@@ -1,3 +1,4 @@
+#pragma once
 #include <iostream>
 #include <string>
 #include <vector>
@@ -19,10 +20,23 @@ struct HttpRequest{
     std::string _path;
     std::unordered_map<std::string, std::string> _headers;
     std::string _body;
+    std::string _ip;
     SOCKET clientSocket = NULL;
-    HttpRequest(): _method(NULL),_path(NULL), _headers(std::unordered_map<std::string, std::string>()), _body(""){}
+    HttpRequest(): _method(NULL),_path(NULL), _headers(std::unordered_map<std::string, std::string>()), _body(""), _ip(""){}
     HttpRequest(std::string method, std::string path, std::unordered_map<std::string, std::string> headers, std::string body, SOCKET socket):
-    _method (method), _path(path), _headers(headers), _body(body) , clientSocket(socket) {}
+    _method (method), _path(path), _headers(headers), _body(body) , clientSocket(socket) {
+
+                // Querry IP
+
+        struct sockaddr_in addr;
+        socklen_t addr_size = sizeof(struct sockaddr_in);
+        getpeername(socket, (struct sockaddr *)&addr, &addr_size);
+
+        char client_ip[INET_ADDRSTRLEN];
+        inet_ntop(AF_INET, &addr.sin_addr, client_ip, INET_ADDRSTRLEN);
+
+        _ip = (std::string)client_ip;
+    }
 
     std::string prepareMessage(std::string body, std::unordered_map<std::string, std::string> headers = {{"Content-Type", "application/json"}}){
         std::string message = "HTTP/1.1 200 OK\r\n";

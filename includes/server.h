@@ -1,4 +1,4 @@
-
+#pragma once
 #include "storage_engine.h"
 #include "router.h"
 #include "config.h"
@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cctype>
 #include <string>
+#include "reqguard.h"
 #pragma comment(lib, "ws2_32.lib")
 
 #define MAX_EVENTS 10
@@ -19,6 +20,8 @@ class Server{
         StorageEngine _storageEngine;
         Router _router;
         Configuration _config;
+
+        RequestGuard _reqguard;
     public:
         Server(Configuration config);
         SOCKET acceptRequest();
