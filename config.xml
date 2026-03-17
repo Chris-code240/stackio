@@ -10,7 +10,7 @@
         <secret>some_secret_key123</secret>
     </auth>
     <storage>
-        <data_dir>/</data_dir>
+        <data_dir>data</data_dir>
         <flush_interval_ms>60</flush_interval_ms>
         <snapshot_file>snapshot_file.dat</snapshot_file>
         <wal_file>wal.json</wal_file>

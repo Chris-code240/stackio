@@ -58,7 +58,6 @@ struct HttpRequest{
 
 
 struct Response{
-    bool success = false;
     std::string _body;
     std::vector<std::string> error;
     int statusCode = 200;
@@ -69,9 +68,22 @@ struct Response{
     }
     std::string dump(){
         _body = "HTTP/1.1 " + std::to_string(statusCode) +" " + Errors.at(statusCode) + "\r\n";
+        _body += "Server: StackIO\r\n";
+        time_t timestamp;
+        time(&timestamp);
+        struct tm *time_info = gmtime(&timestamp); // Use gmtime for GMT
+
+        // 2. Format the string
+        char buffer[80];
+        // %a = Abbreviated weekday, %b = Abbrev. month, %d = day, %H:%M = time
+        std::strftime(buffer, sizeof(buffer), "%a %b %d %H:%M %Z", time_info);
+
+        _body += "Date: " + std::string(buffer) + "\r\n";
+
         if(isJsonResponse) _body += ("Content-Type: application/json\r\n");
         else  _body += ("Content-Type: text/plain\r\n");
         _body += "Content-Length: " + std::to_string(_data.dump().size()) + "\r\n";
+        _body += "Connection: close\r\n";
 
         if(_data.dump().size()){
             _body += "\r\n" + _data.dump();

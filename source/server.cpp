@@ -90,13 +90,24 @@ Server::Server(Configuration config): _config(config), _reqguard(config._apiConf
     //
     generateAuthCredentials();
     //
-    // bind socket
+
     _socket_address.sin_family = AF_INET;
     _socket_address.sin_port = htons(_port);
-    _socket_address.sin_addr.s_addr = htonl(INADDR_ANY);
 
-    if(bind(_socket, (struct sockaddr*)&_socket_address,sizeof(_socket_address)) == SOCKET_ERROR){
-        std::cout<<"[SERVER_ERROR] Binding error\n";
+
+    int status = inet_pton(AF_INET, config._serverConfig._host.c_str(), &_socket_address.sin_addr);
+
+    if (status <= 0) {
+        if (status == 0) {
+            std::cerr << "[ERROR] Invalid IP format: " << config._serverConfig._host << "\n";
+        } else {
+            std::perror("[ERROR] inet_pton error");
+        }
+        std::exit(-1);
+    }
+
+    if (bind(_socket, (struct sockaddr*)&_socket_address, sizeof(_socket_address)) == -1) {
+        std::perror("[SERVER_ERROR] Binding error");
         std::exit(-1);
     }
 
